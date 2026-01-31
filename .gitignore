@@ -1,6 +1,12 @@
 *.bin
 models/
-data/
+# data/
+data/hendrycks_math/evaluation_results*
+data/hendrycks_math/sft*
+data/hendrycks_math/ei_rollouts/
+outputs/
+wandb/
+checkpoints/
 
 nav
 tags

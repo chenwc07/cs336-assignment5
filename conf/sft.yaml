@@ -1,0 +1,39 @@
+policy:
+  model_id: /data1/chenweicong/models/Qwen/Qwen2.5-Math-1.5B
+  device: cuda:0
+  dtype: bfloat16
+  attn_implementation: flash_attention_2
+
+vllm:
+  model_id: /data1/chenweicong/models/Qwen/Qwen2.5-Math-1.5B
+  device: cuda:1
+  dtype: bfloat16
+  seed: 42
+
+train:
+  data_path: /home/chenweicong/projects/assignment5-alignment/data/hendrycks_math/sft_short.jsonl
+  micro_batch_size: 8
+  gradient_accumulation_steps: 4
+  run_name: sft_math
+  log_interval: 1
+  total_steps: 180
+  normalize_constant: 1.0
+  per_token_loss: false
+
+optimizer:
+  lr: 2e-5
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+
+data:
+  prompt_template_path: /home/chenweicong/projects/assignment5-alignment/cs336_alignment/prompts/r1_zero.prompt
+
+eval:
+  batch_size: 8
+  data_path: /home/chenweicong/projects/assignment5-alignment/data/hendrycks_math/validation.jsonl
+  max_eval_samples: 1280
+  eval_interval_steps: 30
+
+checkpoint:
+  save_dir: ./checkpoints/sft_qwen2.5_math
+  save_interval_steps: 90
