@@ -1,3 +1,6 @@
+import os
+from dotenv import load_dotenv
+load_dotenv()
 import hydra
 from omegaconf import DictConfig
 import torch
@@ -56,7 +59,7 @@ def main(cfg: DictConfig):
     )
 
     # ========== Initialize WandB Logger ==========
-    wandb.login(key="ce0521d2e513e642494e70096e7606178ecd2158")
+    wandb.login(key=os.getenv("WANDB_KEY"))
     logger = wandb.init(
         entity="cwc7", 
         project="cs336-alignment-grpo", 
@@ -125,6 +128,13 @@ def main(cfg: DictConfig):
         micro_train_batch_size = cfg.train.train_batch_size // cfg.train.gradient_accumulation_steps
         local_total_steps = (train_dataset.get_length() * n_epochs) // cfg.train.train_batch_size
 
+        # ==========compute old log probs for grpo_clip loss ==========
+        train_dataset.get_data_log_prob(
+            policy_model=policy_model,
+            tokenizer=tokenizer,
+            cfg=cfg
+        )
+
         # ========== Training Loop ==========
         for step in tqdm(range(total_step, total_step + local_total_steps), desc="Training"):
             loss_accum = 0.0
@@ -132,7 +142,7 @@ def main(cfg: DictConfig):
             total_response_tokens = 0
             for microbatch_idx in range(cfg.train.gradient_accumulation_steps):
                 # ========== Get Microbatch Data ==========
-                batch_prompts, batch_answers, batch_rewards, batch_advantages = train_dataset.get_batch(micro_train_batch_size)
+                batch_prompts, batch_answers, batch_rewards, batch_advantages, batch_old_log_probs = train_dataset.get_batch(micro_train_batch_size)
 
                 # ========== Microbatch Train Step ==========
                 tokenized_batch = tokenize_prompt_and_output(
@@ -152,7 +162,13 @@ def main(cfg: DictConfig):
                     old_log_probs = None
                     cliprange = None
                 else:
-                    pass   # TODO: implement old_log_probs and cliprange for grpo_clip loss
+                    # old_log_probs and cliprange for grpo_clip loss
+                    old_log_probs = torch.empty_like(input_ids, dtype=torch.float32).fill_(0)
+                    for i in range(len(batch_old_log_probs)):
+                        min_length = min(len(batch_old_log_probs[i]), old_log_probs.size(1))
+                        old_log_probs[i, :min_length] = torch.tensor(batch_old_log_probs[i][:min_length], dtype=torch.float32)
+                    old_log_probs = old_log_probs.to(policy_model.device)
+                    cliprange = cfg.train.grpo_cliprange
 
                 # forward pass
                 log_probs_dict = get_response_log_probs(

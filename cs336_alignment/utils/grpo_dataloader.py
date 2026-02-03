@@ -1,9 +1,12 @@
 import json
 import random
-
+import torch
 from typing import Callable, Dict
 from vllm import LLM, SamplingParams
+from transformers import PreTrainedTokenizer, PreTrainedModel
+
 from cs336_alignment.utils.grpo_utils import compute_group_normalized_rewards
+from cs336_alignment.utils.utils import get_response_log_probs, tokenize_prompt_and_output
 
 def grpo_rollout(
     vllm_model: LLM,
@@ -99,24 +102,65 @@ class GRPOTrainDataset():
             answer = data["rollout"]
             reward = data["reward"]
             advantage = data["advantage"]
-            self.samples.append((prompt, answer, reward, advantage))
+            self.samples.append((prompt, answer, reward, advantage, []))
         random.shuffle(self.samples)
+
+    def get_data_log_prob(self,
+        policy_model: PreTrainedModel,
+        tokenizer: PreTrainedTokenizer,
+        cfg=None,
+    ) -> None:
+        new_samples = []
+        policy_model.eval()
+        batch_size = cfg.eval.batch_size
+        for i in range(0, len(self.samples), batch_size):
+            batch = self.samples[i:i+batch_size]
+            batch_prompts = [item[0] for item in batch]
+            batch_answers = [item[1] for item in batch]
+            tokenized_batch = tokenize_prompt_and_output(
+                batch_prompts,
+                batch_answers,
+                tokenizer,
+            )
+            input_ids = tokenized_batch["input_ids"].to(policy_model.device)
+            labels = tokenized_batch["labels"].to(policy_model.device)
+            with torch.no_grad():
+                log_probs_dict = get_response_log_probs(
+                    policy_model,
+                    input_ids,
+                    labels,
+                    return_token_entropy=True
+                )
+            log_probs = log_probs_dict["log_probs"].cpu()
+            for j in range(len(batch)):
+                prompt, answer, reward, advantage, _ = batch[j]
+                new_samples.append((
+                    prompt,
+                    answer,
+                    reward,
+                    advantage,
+                    log_probs[j].tolist(),
+                ))
+        self.samples = new_samples
+        policy_model.train()
 
     def get_batch(self, batch_size):
         batch_prompts = []
         batch_answers = []
         batch_rewards = []
         batch_advantages = []
+        batch_log_probs = []
         for _ in range(batch_size):
             if self.ptr >= len(self.samples):
                 self.reset_pointer()
-            prompt, answer, reward, advantage = self.samples[self.ptr]
+            prompt, answer, reward, advantage, log_prob = self.samples[self.ptr]
             batch_prompts.append(prompt)
             batch_answers.append(answer)
             batch_rewards.append(reward)
             batch_advantages.append(advantage)
+            batch_log_probs.append(log_prob)
             self.ptr += 1
-        return batch_prompts, batch_answers, batch_rewards, batch_advantages
+        return batch_prompts, batch_answers, batch_rewards, batch_advantages, batch_log_probs
 
     def get_length(self):
         return len(self.samples)

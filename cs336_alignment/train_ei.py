@@ -1,3 +1,6 @@
+import os
+from dotenv import load_dotenv
+load_dotenv()
 import hydra
 from omegaconf import DictConfig
 import torch
@@ -54,7 +57,7 @@ def main(cfg: DictConfig):
     )
 
     # ========== Initialize WandB Logger ==========
-    wandb.login(key="ce0521d2e513e642494e70096e7606178ecd2158")
+    wandb.login(key=os.getenv("WANDB_KEY"))
     logger = wandb.init(
         entity="cwc7", 
         project="cs336-alignment-ei", 

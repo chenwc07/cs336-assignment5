@@ -21,14 +21,15 @@ rollout:
   sampling_max_tokens: 1024
 
 train:
-  run_name: grpo_math
+  run_name: grpo_off_policy_grpo100_b256_ep2
   data_path: /home/chenweicong/projects/assignment5-alignment/data/hendrycks_math/train.jsonl
   train_batch_size: 256
   gradient_accumulation_steps: 128
-  n_grpo_steps: 200
-  epoch_per_grpo_step: 1
+  n_grpo_steps: 100
+  epoch_per_grpo_step: 2
   log_interval: 1
-  loss_type: reinforce_with_baseline  # options: no_baseline, reinforce_with_baseline, grpo_clip
+  loss_type: grpo_clip  # options: no_baseline, reinforce_with_baseline, grpo_clip
+  grpo_cliprange: 0.2
 
 optimizer:
   lr: 1e-5
@@ -46,5 +47,5 @@ eval:
   eval_interval_steps: 10
 
 checkpoint:
-  save_dir: ./checkpoints/grpo_qwen2.5_math
+  save_dir: ./checkpoints/grpo_qwen2.5_math/grpo_math_off_policy_grpo100_b256_ep2
   save_grpo_interval: 20
