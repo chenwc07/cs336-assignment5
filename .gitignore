@@ -2,7 +2,9 @@
 models/
 # data/
 data/hendrycks_math/evaluation_results*
-data/hendrycks_math/sft*
+data/hendrycks_math/sft.jsonl
+data/hendrycks_math/sft_short_v2.jsonl
+data/hendrycks_math/sft_short_filter.jsonl
 data/hendrycks_math/ei_rollouts/
 data/hendrycks_math/grpo_rollouts/
 outputs/
